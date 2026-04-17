@@ -1,0 +1,53 @@
+name: "🔧 Task"
+description: "A development task from the project breakdown"
+title: "[Task XX] "
+labels: ["type/feature"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What to implement
+      description: Describe what needs to be built in this task
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files to create/modify
+      description: List the files involved
+      placeholder: |
+        - src/main/java/.../TransactionService.java (create)
+        - src/test/java/.../TransactionServiceTest.java (create)
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests to write
+      description: What test cases should be covered
+      placeholder: |
+        - should_create_transaction_with_pending_status
+        - should_reject_invalid_state_transition
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: How to verify this task is complete
+      placeholder: |
+        - All tests pass
+        - docker-compose up runs without errors
+    validations:
+      required: true
+  - type: input
+    id: estimate
+    attributes:
+      label: Time estimate
+      placeholder: "3 hours"
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Which tasks must be completed before this one
+      placeholder: "Task 01, Task 02 (or None)"
