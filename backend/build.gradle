@@ -1,0 +1,122 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.5'
+    id 'io.spring.dependency-management' version '1.1.5'
+    id 'jacoco'
+}
+
+group = 'dev.cuong'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    resilience4jVersion = '2.2.0'
+    testcontainersVersion = '1.19.8'
+    jjwtVersion = '0.12.5'
+}
+
+dependencies {
+    // ── Spring Boot Starters ─────────────────────────────────────────────────
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'  // required for Resilience4j annotations
+
+    // ── Kafka ────────────────────────────────────────────────────────────────
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // ── Database ─────────────────────────────────────────────────────────────
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // ── Redis / Distributed Lock ──────────────────────────────────────────────
+    // Redisson provides RedissonClient (for RLock, RScoredSortedSet) and
+    // auto-configures via spring.data.redis.* properties
+    implementation 'org.redisson:redisson-spring-boot-starter:3.27.2'
+
+    // ── Resilience4j (Circuit Breaker + Retry) ────────────────────────────────
+    implementation "io.github.resilience4j:resilience4j-spring-boot3:${resilience4jVersion}"
+
+    // ── JWT ──────────────────────────────────────────────────────────────────
+    implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
+
+    // ── Metrics ──────────────────────────────────────────────────────────────
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // ── Structured Logging ────────────────────────────────────────────────────
+    // Used in Task 16; declared here so logback-spring.xml can reference it from the start
+    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+
+    // ── Lombok ───────────────────────────────────────────────────────────────
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // ── Test ─────────────────────────────────────────────────────────────────
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+
+    // Testcontainers modules
+    testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
+    testImplementation "org.testcontainers:kafka:${testcontainersVersion}"
+    testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+
+    // H2 for the ApplicationContext smoke test (no real infra needed for wiring check)
+    testRuntimeOnly 'com.h2database:h2'
+
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+bootRun {
+    // On Windows with Docker Desktop (WSL2), Docker only binds ports to IPv6 interfaces.
+    // Java defaults to IPv4 (127.0.0.1) for localhost; forcing IPv6 preference lets
+    // Redisson/Netty connect to the Docker Redis via ::1.
+    jvmArgs = ['-Djava.net.preferIPv6Addresses=true']
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = '0.8.11'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    // Report on service/domain layers, exclude generated/config classes
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, excludes: [
+                '**/PaymentTransactionServiceApplication.class',
+                '**/config/**',
+                '**/exception/**'
+            ])
+        }))
+    }
+}
