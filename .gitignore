@@ -80,3 +80,9 @@ backend/build/reports/
 
 # ── k6 load test output ───────────────────────────────────────────────────────
 load-test/results/
+
+# ── Miscellaneous ─────────────────────────────────────────────────────────────
+.claude/
+CLAUDE.md
+PROJECT_1_PAYMENT_TRANSACTION_SERVICE.md
+WORKFLOW.md
