@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -53,6 +54,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInvalidState(InvalidTransactionStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError("INVALID_TRANSACTION_STATE", e.getMessage()));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiError> handleMissingHeader(MissingRequestHeaderException e) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError("MISSING_HEADER", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
