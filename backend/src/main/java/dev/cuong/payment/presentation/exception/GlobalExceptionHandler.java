@@ -11,6 +11,7 @@ import dev.cuong.payment.domain.exception.SameAccountTransferException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -62,6 +63,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInvalidState(InvalidTransactionStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError("INVALID_TRANSACTION_STATE", e.getMessage()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        log.warn("Optimistic lock conflict on {}: {}", e.getPersistentClassName(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError("CONFLICT_CONCURRENT_UPDATE",
+                        "The operation conflicted with a concurrent update. Please retry."));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
