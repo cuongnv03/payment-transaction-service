@@ -3,7 +3,6 @@ package dev.cuong.payment.domain;
 import dev.cuong.payment.domain.exception.InvalidTransactionStateException;
 import dev.cuong.payment.domain.model.Transaction;
 import dev.cuong.payment.domain.vo.TransactionStatus;
-import dev.cuong.payment.domain.vo.TransactionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -152,12 +151,12 @@ class TransactionStateMachineTest {
     private Transaction pendingTransaction() {
         return Transaction.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
-                .accountId(UUID.randomUUID())
+                .fromAccountId(UUID.randomUUID())
+                .toAccountId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .currency("USD")
-                .type(TransactionType.PAYMENT)
                 .status(TransactionStatus.PENDING)
+                .retryCount(0)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();

@@ -29,7 +29,7 @@ class AccountRepositoryAdapterIntegrationTest extends AbstractPersistenceIntegra
     @BeforeEach
     void setupUser() {
         User user = userRepository.save(User.builder()
-                .username("account-test-user-" + UUID.randomUUID())
+                .username("acct-" + UUID.randomUUID())
                 .email("acct-" + UUID.randomUUID() + "@test.com")
                 .passwordHash("hash")
                 .role(UserRole.USER)

@@ -98,20 +98,20 @@ class FlywayMigrationIntegrationTest {
     void should_reject_invalid_transaction_status() {
         jdbcTemplate.execute("""
             INSERT INTO users (id, username, email, password_hash, role)
-            VALUES ('20000000-0000-0000-0000-000000000001',
-                    'statususer', 'status@test.com', 'hash', 'USER')
+            VALUES ('20000000-0000-0000-0000-000000000001', 'statususer1', 'status1@test.com', 'hash', 'USER'),
+                   ('20000000-0000-0000-0000-000000000002', 'statususer2', 'status2@test.com', 'hash', 'USER')
             """);
         jdbcTemplate.execute("""
             INSERT INTO accounts (id, user_id, balance)
-            VALUES ('20000000-0000-0000-0000-000000000001',
-                    '20000000-0000-0000-0000-000000000001', 1000.00)
+            VALUES ('20000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 1000.00),
+                   ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 500.00)
             """);
 
         assertThatThrownBy(() -> jdbcTemplate.execute("""
-            INSERT INTO transactions (user_id, account_id, amount, type, status)
+            INSERT INTO transactions (from_account_id, to_account_id, amount, currency, status)
             VALUES ('20000000-0000-0000-0000-000000000001',
-                    '20000000-0000-0000-0000-000000000001',
-                    100.00, 'PAYMENT', 'BOGUS_STATUS')
+                    '20000000-0000-0000-0000-000000000002',
+                    100.00, 'USD', 'BOGUS_STATUS')
             """))
             .isInstanceOf(DataIntegrityViolationException.class)
             .hasMessageContaining("ck_transactions_status");
@@ -119,26 +119,24 @@ class FlywayMigrationIntegrationTest {
 
     @Test
     @Transactional
-    void should_reject_invalid_transaction_type() {
+    void should_reject_self_transfer() {
         jdbcTemplate.execute("""
             INSERT INTO users (id, username, email, password_hash, role)
-            VALUES ('30000000-0000-0000-0000-000000000001',
-                    'typeuser', 'type@test.com', 'hash', 'USER')
+            VALUES ('30000000-0000-0000-0000-000000000001', 'selfuser', 'self@test.com', 'hash', 'USER')
             """);
         jdbcTemplate.execute("""
             INSERT INTO accounts (id, user_id, balance)
-            VALUES ('30000000-0000-0000-0000-000000000001',
-                    '30000000-0000-0000-0000-000000000001', 500.00)
+            VALUES ('30000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 500.00)
             """);
 
         assertThatThrownBy(() -> jdbcTemplate.execute("""
-            INSERT INTO transactions (user_id, account_id, amount, type)
+            INSERT INTO transactions (from_account_id, to_account_id, amount, currency)
             VALUES ('30000000-0000-0000-0000-000000000001',
                     '30000000-0000-0000-0000-000000000001',
-                    50.00, 'WIRE_TRANSFER')
+                    50.00, 'USD')
             """))
             .isInstanceOf(DataIntegrityViolationException.class)
-            .hasMessageContaining("ck_transactions_type");
+            .hasMessageContaining("ck_transactions_diff_accounts");
     }
 
     @Test
@@ -146,20 +144,20 @@ class FlywayMigrationIntegrationTest {
     void should_reject_zero_or_negative_transaction_amount() {
         jdbcTemplate.execute("""
             INSERT INTO users (id, username, email, password_hash, role)
-            VALUES ('40000000-0000-0000-0000-000000000001',
-                    'amountuser', 'amount@test.com', 'hash', 'USER')
+            VALUES ('40000000-0000-0000-0000-000000000001', 'amountuser1', 'amount1@test.com', 'hash', 'USER'),
+                   ('40000000-0000-0000-0000-000000000002', 'amountuser2', 'amount2@test.com', 'hash', 'USER')
             """);
         jdbcTemplate.execute("""
             INSERT INTO accounts (id, user_id, balance)
-            VALUES ('40000000-0000-0000-0000-000000000001',
-                    '40000000-0000-0000-0000-000000000001', 200.00)
+            VALUES ('40000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', 200.00),
+                   ('40000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000002', 200.00)
             """);
 
         assertThatThrownBy(() -> jdbcTemplate.execute("""
-            INSERT INTO transactions (user_id, account_id, amount, type)
+            INSERT INTO transactions (from_account_id, to_account_id, amount, currency)
             VALUES ('40000000-0000-0000-0000-000000000001',
-                    '40000000-0000-0000-0000-000000000001',
-                    0.00, 'PAYMENT')
+                    '40000000-0000-0000-0000-000000000002',
+                    0.00, 'USD')
             """))
             .isInstanceOf(DataIntegrityViolationException.class)
             .hasMessageContaining("ck_transactions_amount");

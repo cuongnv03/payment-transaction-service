@@ -4,6 +4,7 @@ import dev.cuong.payment.application.port.out.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 
 import java.util.List;
 import java.util.UUID;
@@ -69,7 +70,9 @@ public class RedisRateLimiter implements RateLimiter {
         long windowMs = windowSeconds * 1000;
         String member = UUID.randomUUID().toString();
 
-        RScript script = redissonClient.getScript();
+        // StringCodec sends args as raw UTF-8 strings so tonumber() in the Lua script works.
+        // Redisson's default codec serializes values as binary, which Lua cannot parse numerically.
+        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
         Long result = script.eval(
                 RScript.Mode.READ_WRITE,
                 SCRIPT,
