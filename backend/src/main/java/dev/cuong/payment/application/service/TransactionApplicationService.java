@@ -5,6 +5,7 @@ import dev.cuong.payment.application.dto.PagedResult;
 import dev.cuong.payment.application.dto.TransactionResult;
 import dev.cuong.payment.application.port.in.CreateTransactionUseCase;
 import dev.cuong.payment.application.port.in.GetTransactionUseCase;
+import dev.cuong.payment.application.port.in.RefundTransactionUseCase;
 import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.TransactionRepository;
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
@@ -26,7 +27,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TransactionApplicationService implements CreateTransactionUseCase, GetTransactionUseCase {
+public class TransactionApplicationService implements CreateTransactionUseCase, GetTransactionUseCase, RefundTransactionUseCase {
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
@@ -116,6 +117,35 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
         return transactionRepository.findByIdAndFromAccountId(transactionId, fromAccountId)
                 .map(this::toResult)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+    }
+
+    @Override
+    @Transactional
+    public TransactionResult refundTransaction(UUID userId, UUID transactionId) {
+        UUID fromAccountId = accountRepository.findByUserId(userId)
+                .orElseThrow(() -> new AccountNotFoundException(userId))
+                .getId();
+
+        // Scoped load — 404 if the transaction belongs to a different account
+        Transaction transaction = transactionRepository.findByIdAndFromAccountId(transactionId, fromAccountId)
+                .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+
+        // State machine validates SUCCESS → REFUNDED; throws InvalidTransactionStateException otherwise
+        transaction.refund();
+
+        // Pessimistic lock on the account for the credit — prevents concurrent balance corruption
+        Account fromAccount = accountRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new AccountNotFoundException(userId));
+
+        fromAccount.credit(transaction.getAmount());
+
+        transactionRepository.save(transaction);
+        accountRepository.save(fromAccount);
+
+        log.info("Refund processed: transactionId={}, fromAccountId={}, amount={}",
+                transactionId, fromAccountId, transaction.getAmount());
+
+        return toResult(transaction);
     }
 
     private TransactionResult toResult(Transaction tx) {

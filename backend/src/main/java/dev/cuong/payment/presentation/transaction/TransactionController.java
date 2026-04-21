@@ -5,6 +5,7 @@ import dev.cuong.payment.application.dto.PagedResult;
 import dev.cuong.payment.application.dto.TransactionResult;
 import dev.cuong.payment.application.port.in.CreateTransactionUseCase;
 import dev.cuong.payment.application.port.in.GetTransactionUseCase;
+import dev.cuong.payment.application.port.in.RefundTransactionUseCase;
 import dev.cuong.payment.domain.vo.TransactionStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class TransactionController {
 
     private final CreateTransactionUseCase createTransactionUseCase;
     private final GetTransactionUseCase getTransactionUseCase;
+    private final RefundTransactionUseCase refundTransactionUseCase;
 
     /**
      * Creates a P2P transaction: debits the sender's account and creates a PENDING record.
@@ -96,6 +98,24 @@ public class TransactionController {
 
         return ResponseEntity.ok(
                 toResponse(getTransactionUseCase.getMyTransaction(userId, transactionId)));
+    }
+
+    /**
+     * Initiates a refund for a completed transaction — only allowed from {@code SUCCESS} status.
+     * Credits the original sender's account immediately. The receiver-side deduction is handled
+     * by the async consumer in Task 12.
+     *
+     * @return 200 with transaction in REFUNDED status; 404 if not found or owned by another user;
+     *         409 if not in SUCCESS status or a concurrent refund was already processed;
+     *         401 if unauthenticated
+     */
+    @PostMapping("/{transactionId}/refund")
+    public ResponseEntity<TransactionResponse> refundTransaction(
+            @AuthenticationPrincipal UUID userId,
+            @PathVariable UUID transactionId) {
+
+        return ResponseEntity.ok(
+                toResponse(refundTransactionUseCase.refundTransaction(userId, transactionId)));
     }
 
     private TransactionResponse toResponse(TransactionResult r) {
