@@ -1,12 +1,15 @@
 package dev.cuong.payment.application.service;
 
 import dev.cuong.payment.application.dto.CreateTransactionCommand;
+import dev.cuong.payment.application.dto.PagedResult;
 import dev.cuong.payment.application.dto.TransactionResult;
 import dev.cuong.payment.application.port.in.CreateTransactionUseCase;
+import dev.cuong.payment.application.port.in.GetTransactionUseCase;
 import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.TransactionRepository;
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
 import dev.cuong.payment.domain.exception.SameAccountTransferException;
+import dev.cuong.payment.domain.exception.TransactionNotFoundException;
 import dev.cuong.payment.domain.model.Account;
 import dev.cuong.payment.domain.model.Transaction;
 import dev.cuong.payment.domain.vo.TransactionStatus;
@@ -16,12 +19,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TransactionApplicationService implements CreateTransactionUseCase {
+public class TransactionApplicationService implements CreateTransactionUseCase, GetTransactionUseCase {
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
@@ -75,6 +80,42 @@ public class TransactionApplicationService implements CreateTransactionUseCase {
                 saved.getId(), fromAccount.getId(), toAccount.getId(), command.amount());
 
         return toResult(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PagedResult<TransactionResult> getMyTransactions(UUID userId, TransactionStatus status, int page, int size) {
+        UUID fromAccountId = accountRepository.findByUserId(userId)
+                .orElseThrow(() -> new AccountNotFoundException(userId))
+                .getId();
+
+        List<Transaction> txs;
+        long total;
+        if (status != null) {
+            txs = transactionRepository.findByFromAccountIdAndStatus(fromAccountId, status, page, size);
+            total = transactionRepository.countByFromAccountIdAndStatus(fromAccountId, status);
+        } else {
+            txs = transactionRepository.findByFromAccountId(fromAccountId, page, size);
+            total = transactionRepository.countByFromAccountId(fromAccountId);
+        }
+
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
+        log.debug("Fetched transactions: userId={}, status={}, page={}, size={}, total={}",
+                userId, status, page, size, total);
+
+        return new PagedResult<>(txs.stream().map(this::toResult).toList(), page, size, total, totalPages);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TransactionResult getMyTransaction(UUID userId, UUID transactionId) {
+        UUID fromAccountId = accountRepository.findByUserId(userId)
+                .orElseThrow(() -> new AccountNotFoundException(userId))
+                .getId();
+
+        return transactionRepository.findByIdAndFromAccountId(transactionId, fromAccountId)
+                .map(this::toResult)
+                .orElseThrow(() -> new TransactionNotFoundException(transactionId));
     }
 
     private TransactionResult toResult(Transaction tx) {

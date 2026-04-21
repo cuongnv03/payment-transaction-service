@@ -1,5 +1,6 @@
 package dev.cuong.payment.infrastructure.persistence.repository;
 
+import dev.cuong.payment.domain.vo.TransactionStatus;
 import dev.cuong.payment.infrastructure.persistence.entity.TransactionJpaEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,7 +15,11 @@ public interface TransactionJpaRepository extends JpaRepository<TransactionJpaEn
 
     Page<TransactionJpaEntity> findByFromAccountId(UUID fromAccountId, Pageable pageable);
 
+    Page<TransactionJpaEntity> findByFromAccountIdAndStatus(UUID fromAccountId, TransactionStatus status, Pageable pageable);
+
     long countByFromAccountId(UUID fromAccountId);
+
+    long countByFromAccountIdAndStatus(UUID fromAccountId, TransactionStatus status);
 
     Optional<TransactionJpaEntity> findByIdempotencyKey(String idempotencyKey);
 }

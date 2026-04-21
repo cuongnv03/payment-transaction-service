@@ -2,6 +2,7 @@ package dev.cuong.payment.infrastructure.persistence.adapter;
 
 import dev.cuong.payment.application.port.out.TransactionRepository;
 import dev.cuong.payment.domain.model.Transaction;
+import dev.cuong.payment.domain.vo.TransactionStatus;
 import dev.cuong.payment.infrastructure.persistence.mapper.TransactionMapper;
 import dev.cuong.payment.infrastructure.persistence.repository.TransactionJpaRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,8 +39,21 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public List<Transaction> findByFromAccountIdAndStatus(UUID fromAccountId, TransactionStatus status, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return jpaRepository.findByFromAccountIdAndStatus(fromAccountId, status, pageable)
+                .map(TransactionMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public long countByFromAccountId(UUID fromAccountId) {
         return jpaRepository.countByFromAccountId(fromAccountId);
+    }
+
+    @Override
+    public long countByFromAccountIdAndStatus(UUID fromAccountId, TransactionStatus status) {
+        return jpaRepository.countByFromAccountIdAndStatus(fromAccountId, status);
     }
 
     @Override
