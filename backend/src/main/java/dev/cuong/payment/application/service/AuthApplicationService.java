@@ -5,9 +5,11 @@ import dev.cuong.payment.application.dto.LoginCommand;
 import dev.cuong.payment.application.dto.RegisterUserCommand;
 import dev.cuong.payment.application.port.in.LoginUseCase;
 import dev.cuong.payment.application.port.in.RegisterUserUseCase;
+import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.UserRepository;
 import dev.cuong.payment.domain.exception.InvalidCredentialsException;
 import dev.cuong.payment.domain.exception.UserAlreadyExistsException;
+import dev.cuong.payment.domain.model.Account;
 import dev.cuong.payment.domain.model.User;
 import dev.cuong.payment.domain.vo.UserRole;
 import dev.cuong.payment.infrastructure.security.JwtService;
@@ -17,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Service
@@ -25,6 +28,7 @@ import java.time.Instant;
 public class AuthApplicationService implements RegisterUserUseCase, LoginUseCase {
 
     private final UserRepository userRepository;
+    private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -49,6 +53,18 @@ public class AuthApplicationService implements RegisterUserUseCase, LoginUseCase
                 .build();
 
         User saved = userRepository.save(user);
+
+        // Account created atomically with the user — same @Transactional boundary.
+        // If account INSERT fails, the user row rolls back too (no orphaned users).
+        Account account = Account.builder()
+                .userId(saved.getId())
+                .balance(BigDecimal.ZERO)
+                .currency("USD")
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        accountRepository.save(account);
+
         String token = jwtService.generateToken(saved.getId(), saved.getUsername(), saved.getRole());
 
         log.info("User registered: userId={}, username={}", saved.getId(), saved.getUsername());
