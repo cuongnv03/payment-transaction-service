@@ -1,5 +1,8 @@
 package dev.cuong.payment.infrastructure.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.cuong.payment.application.port.out.RateLimiter;
+import dev.cuong.payment.infrastructure.ratelimit.RateLimitFilter;
 import dev.cuong.payment.infrastructure.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +24,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimiter rateLimiter;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -33,6 +38,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Rate limit runs after JWT sets the principal in the SecurityContext
+                .addFilterAfter(new RateLimitFilter(rateLimiter, objectMapper), JwtAuthenticationFilter.class)
                 .build();
     }
 
