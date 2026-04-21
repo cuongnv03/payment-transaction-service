@@ -7,6 +7,7 @@ import dev.cuong.payment.domain.exception.TransactionNotFoundException;
 import dev.cuong.payment.domain.exception.UserAlreadyExistsException;
 import dev.cuong.payment.domain.exception.UserNotFoundException;
 import dev.cuong.payment.domain.exception.InsufficientFundsException;
+import dev.cuong.payment.domain.exception.RateLimitExceededException;
 import dev.cuong.payment.domain.exception.SameAccountTransferException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInsufficientFunds(InsufficientFundsException e) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(new ApiError("INSUFFICIENT_FUNDS", e.getMessage()));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> handleRateLimit(RateLimitExceededException e) {
+        return ResponseEntity.status(429)
+                .header("Retry-After", "60")
+                .body(new ApiError("RATE_LIMIT_EXCEEDED", e.getMessage()));
     }
 
     @ExceptionHandler(InvalidTransactionStateException.class)
