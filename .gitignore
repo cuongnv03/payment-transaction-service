@@ -83,6 +83,7 @@ load-test/results/
 
 # ── Miscellaneous ─────────────────────────────────────────────────────────────
 .claude/
+docs/
 CLAUDE.md
 PROJECT_1_PAYMENT_TRANSACTION_SERVICE.md
 WORKFLOW.md

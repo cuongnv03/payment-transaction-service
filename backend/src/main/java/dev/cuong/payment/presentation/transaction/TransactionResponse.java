@@ -4,15 +4,15 @@ import java.math.BigDecimal;
 
 public record TransactionResponse(
         String id,
-        String userId,
-        String accountId,
+        String fromAccountId,
+        String toAccountId,
         BigDecimal amount,
         String currency,
-        String type,
         String status,
         String description,
         String gatewayReference,
         String failureReason,
+        int retryCount,
         String processedAt,
         String refundedAt,
         String createdAt,

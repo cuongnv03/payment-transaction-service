@@ -6,10 +6,10 @@ import dev.cuong.payment.application.port.in.CreateTransactionUseCase;
 import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.TransactionRepository;
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
+import dev.cuong.payment.domain.exception.SameAccountTransferException;
 import dev.cuong.payment.domain.model.Account;
 import dev.cuong.payment.domain.model.Transaction;
 import dev.cuong.payment.domain.vo.TransactionStatus;
-import dev.cuong.payment.domain.vo.TransactionType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,36 +38,41 @@ public class TransactionApplicationService implements CreateTransactionUseCase {
             return toResult(existing.get());
         }
 
-        // Pessimistic lock: prevents concurrent balance updates for the same account
-        Account account = accountRepository.findByUserIdForUpdate(command.userId())
+        // Pessimistic lock on sender's account — serialises concurrent balance updates
+        Account fromAccount = accountRepository.findByUserIdForUpdate(command.userId())
                 .orElseThrow(() -> new AccountNotFoundException(command.userId()));
 
-        // DEPOSIT credits the account; all other types debit (throws if insufficient funds)
-        if (command.type() == TransactionType.DEPOSIT) {
-            account.credit(command.amount());
-        } else {
-            account.debit(command.amount());
+        // Load receiver's account (no lock — we only credit it on SUCCESS in the consumer)
+        Account toAccount = accountRepository.findById(command.toAccountId())
+                .orElseThrow(() -> new AccountNotFoundException(command.toAccountId()));
+
+        // Fail fast before hitting the DB diff_accounts constraint
+        if (fromAccount.getId().equals(toAccount.getId())) {
+            throw new SameAccountTransferException(fromAccount.getId());
         }
+
+        // Hold the funds immediately — restored on FAILED/TIMEOUT by the processing consumer
+        fromAccount.debit(command.amount());
 
         Instant now = Instant.now();
         Transaction transaction = Transaction.builder()
-                .userId(command.userId())
-                .accountId(account.getId())
+                .fromAccountId(fromAccount.getId())
+                .toAccountId(toAccount.getId())
                 .amount(command.amount())
-                .currency(account.getCurrency())
-                .type(command.type())
+                .currency(fromAccount.getCurrency())
                 .status(TransactionStatus.PENDING)
                 .description(command.description())
                 .idempotencyKey(command.idempotencyKey())
+                .retryCount(0)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
-        accountRepository.save(account);
+        accountRepository.save(fromAccount);
         Transaction saved = transactionRepository.save(transaction);
 
-        log.info("Transaction created: transactionId={}, userId={}, amount={}, type={}, status={}",
-                saved.getId(), command.userId(), command.amount(), command.type(), saved.getStatus());
+        log.info("Transaction created: transactionId={}, fromAccountId={}, toAccountId={}, amount={}",
+                saved.getId(), fromAccount.getId(), toAccount.getId(), command.amount());
 
         return toResult(saved);
     }
@@ -75,16 +80,16 @@ public class TransactionApplicationService implements CreateTransactionUseCase {
     private TransactionResult toResult(Transaction tx) {
         return new TransactionResult(
                 tx.getId(),
-                tx.getUserId(),
-                tx.getAccountId(),
+                tx.getFromAccountId(),
+                tx.getToAccountId(),
                 tx.getAmount(),
                 tx.getCurrency(),
-                tx.getType().name(),
                 tx.getStatus().name(),
                 tx.getDescription(),
                 tx.getIdempotencyKey(),
                 tx.getGatewayReference(),
                 tx.getFailureReason(),
+                tx.getRetryCount(),
                 tx.getProcessedAt(),
                 tx.getRefundedAt(),
                 tx.getCreatedAt(),

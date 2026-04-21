@@ -7,6 +7,7 @@ import dev.cuong.payment.domain.exception.TransactionNotFoundException;
 import dev.cuong.payment.domain.exception.UserAlreadyExistsException;
 import dev.cuong.payment.domain.exception.UserNotFoundException;
 import dev.cuong.payment.domain.exception.InsufficientFundsException;
+import dev.cuong.payment.domain.exception.SameAccountTransferException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleNotFound(Exception e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError("NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(SameAccountTransferException.class)
+    public ResponseEntity<ApiError> handleSameAccountTransfer(SameAccountTransferException e) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError("SAME_ACCOUNT_TRANSFER", e.getMessage()));
     }
 
     @ExceptionHandler(InsufficientFundsException.class)

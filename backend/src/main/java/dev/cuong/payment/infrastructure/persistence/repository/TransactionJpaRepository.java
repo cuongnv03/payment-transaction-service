@@ -10,11 +10,11 @@ import java.util.UUID;
 
 public interface TransactionJpaRepository extends JpaRepository<TransactionJpaEntity, UUID> {
 
-    Optional<TransactionJpaEntity> findByIdAndUserId(UUID id, UUID userId);
+    Optional<TransactionJpaEntity> findByIdAndFromAccountId(UUID id, UUID fromAccountId);
 
-    Page<TransactionJpaEntity> findByUserId(UUID userId, Pageable pageable);
+    Page<TransactionJpaEntity> findByFromAccountId(UUID fromAccountId, Pageable pageable);
 
-    long countByUserId(UUID userId);
+    long countByFromAccountId(UUID fromAccountId);
 
     Optional<TransactionJpaEntity> findByIdempotencyKey(String idempotencyKey);
 }

@@ -1,7 +1,6 @@
 package dev.cuong.payment.domain.model;
 
 import dev.cuong.payment.domain.vo.TransactionStatus;
-import dev.cuong.payment.domain.vo.TransactionType;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -21,16 +20,16 @@ import java.util.UUID;
 public class Transaction {
 
     private final UUID id;
-    private final UUID userId;
-    private final UUID accountId;
+    private final UUID fromAccountId;
+    private final UUID toAccountId;
     private final BigDecimal amount;
     private final String currency;
-    private final TransactionType type;
     private TransactionStatus status;
     private final String description;
     private final String idempotencyKey;
     private String gatewayReference;
     private String failureReason;
+    private int retryCount;
     private long version;
     private Instant processedAt;
     private Instant refundedAt;
@@ -63,6 +62,11 @@ public class Transaction {
     public void refund() {
         this.status = status.transitionTo(TransactionStatus.REFUNDED);
         this.refundedAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
+    public void incrementRetryCount() {
+        this.retryCount++;
         this.updatedAt = Instant.now();
     }
 }

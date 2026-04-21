@@ -17,6 +17,11 @@ public class AccountRepositoryAdapter implements AccountRepository {
     private final AccountJpaRepository jpaRepository;
 
     @Override
+    public Optional<Account> findById(UUID accountId) {
+        return jpaRepository.findById(accountId).map(AccountMapper::toDomain);
+    }
+
+    @Override
     public Optional<Account> findByUserId(UUID userId) {
         return jpaRepository.findByUserId(userId).map(AccountMapper::toDomain);
     }

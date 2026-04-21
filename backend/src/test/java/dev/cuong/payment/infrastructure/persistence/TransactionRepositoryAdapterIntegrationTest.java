@@ -7,7 +7,6 @@ import dev.cuong.payment.domain.model.Account;
 import dev.cuong.payment.domain.model.Transaction;
 import dev.cuong.payment.domain.model.User;
 import dev.cuong.payment.domain.vo.TransactionStatus;
-import dev.cuong.payment.domain.vo.TransactionType;
 import dev.cuong.payment.domain.vo.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,31 +31,16 @@ class TransactionRepositoryAdapterIntegrationTest extends AbstractPersistenceInt
     @Autowired
     private UserRepository userRepository;
 
-    private UUID userId;
-    private UUID accountId;
+    private UUID fromAccountId;
+    private UUID toAccountId;
 
     @BeforeEach
-    void setupUserAndAccount() {
-        User user = userRepository.save(User.builder()
-                .username("tx-test-user-" + UUID.randomUUID())
-                .email("tx-" + UUID.randomUUID() + "@test.com")
-                .passwordHash("hash")
-                .role(UserRole.USER)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
-        userId = user.getId();
-
-        Account account = accountRepository.save(Account.builder()
-                .userId(userId)
-                .balance(new BigDecimal("5000.00"))
-                .currency("USD")
-                .version(0L)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build());
-        accountId = account.getId();
+    void setupAccounts() {
+        fromAccountId = createAccountForNewUser("sender");
+        toAccountId   = createAccountForNewUser("receiver");
     }
+
+    // ── Basic CRUD ────────────────────────────────────────────────────────────
 
     @Test
     void should_persist_and_find_transaction_by_id() {
@@ -67,30 +51,32 @@ class TransactionRepositoryAdapterIntegrationTest extends AbstractPersistenceInt
         assertThat(found).isPresent();
         assertThat(found.get().getAmount()).isEqualByComparingTo("250.00");
         assertThat(found.get().getStatus()).isEqualTo(TransactionStatus.PENDING);
-        assertThat(found.get().getType()).isEqualTo(TransactionType.PAYMENT);
+        assertThat(found.get().getFromAccountId()).isEqualTo(fromAccountId);
+        assertThat(found.get().getToAccountId()).isEqualTo(toAccountId);
     }
 
+    // ── Scoped access ─────────────────────────────────────────────────────────
+
     @Test
-    void should_find_transaction_scoped_to_user() {
+    void should_find_transaction_scoped_to_from_account() {
         Transaction saved = transactionRepository.save(buildTransaction(null));
 
-        Optional<Transaction> found = transactionRepository.findByIdAndUserId(saved.getId(), userId);
-        Optional<Transaction> notFound = transactionRepository.findByIdAndUserId(saved.getId(), UUID.randomUUID());
+        Optional<Transaction> found    = transactionRepository.findByIdAndFromAccountId(saved.getId(), fromAccountId);
+        Optional<Transaction> notFound = transactionRepository.findByIdAndFromAccountId(saved.getId(), UUID.randomUUID());
 
         assertThat(found).isPresent();
         assertThat(notFound).isEmpty();
     }
 
     @Test
-    void should_return_user_transactions_newest_first() {
+    void should_return_sender_transactions_newest_first() {
         transactionRepository.save(buildTransaction(null));
         transactionRepository.save(buildTransaction(null));
         transactionRepository.save(buildTransaction(null));
 
-        List<Transaction> page = transactionRepository.findByUserId(userId, 0, 10);
+        List<Transaction> page = transactionRepository.findByFromAccountId(fromAccountId, 0, 10);
 
         assertThat(page).hasSize(3);
-        // Verify descending order by checking each is not older than the next
         for (int i = 0; i < page.size() - 1; i++) {
             assertThat(page.get(i).getCreatedAt())
                     .isAfterOrEqualTo(page.get(i + 1).getCreatedAt());
@@ -98,48 +84,59 @@ class TransactionRepositoryAdapterIntegrationTest extends AbstractPersistenceInt
     }
 
     @Test
-    void should_count_user_transactions() {
+    void should_count_sender_transactions() {
         transactionRepository.save(buildTransaction(null));
         transactionRepository.save(buildTransaction(null));
 
-        long count = transactionRepository.countByUserId(userId);
-
-        assertThat(count).isEqualTo(2);
+        assertThat(transactionRepository.countByFromAccountId(fromAccountId)).isEqualTo(2);
+        assertThat(transactionRepository.countByFromAccountId(toAccountId)).isZero();
     }
+
+    // ── Idempotency ───────────────────────────────────────────────────────────
 
     @Test
     void should_find_transaction_by_idempotency_key() {
-        String idempotencyKey = "idem-key-" + UUID.randomUUID();
-        transactionRepository.save(buildTransaction(idempotencyKey));
+        String key = "idem-key-" + UUID.randomUUID();
+        transactionRepository.save(buildTransaction(key));
 
-        Optional<Transaction> found = transactionRepository.findByIdempotencyKey(idempotencyKey);
-        Optional<Transaction> missing = transactionRepository.findByIdempotencyKey("nonexistent-key");
-
-        assertThat(found).isPresent();
-        assertThat(missing).isEmpty();
+        assertThat(transactionRepository.findByIdempotencyKey(key)).isPresent();
+        assertThat(transactionRepository.findByIdempotencyKey("nonexistent-key")).isEmpty();
     }
 
-    @Test
-    void should_not_return_other_users_transactions_in_count() {
-        transactionRepository.save(buildTransaction(null));
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-        long countForOtherUser = transactionRepository.countByUserId(UUID.randomUUID());
+    private UUID createAccountForNewUser(String label) {
+        User user = userRepository.save(User.builder()
+                .username(label + "-" + UUID.randomUUID())
+                .email(label + "-" + UUID.randomUUID() + "@test.com")
+                .passwordHash("hash")
+                .role(UserRole.USER)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build());
 
-        assertThat(countForOtherUser).isZero();
+        Account account = accountRepository.save(Account.builder()
+                .userId(user.getId())
+                .balance(new BigDecimal("5000.00"))
+                .currency("USD")
+                .version(0L)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build());
+
+        return account.getId();
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
 
     private Transaction buildTransaction(String idempotencyKey) {
         Instant now = Instant.now();
         return Transaction.builder()
-                .userId(userId)
-                .accountId(accountId)
+                .fromAccountId(fromAccountId)
+                .toAccountId(toAccountId)
                 .amount(new BigDecimal("250.00"))
                 .currency("USD")
-                .type(TransactionType.PAYMENT)
                 .status(TransactionStatus.PENDING)
                 .idempotencyKey(idempotencyKey)
+                .retryCount(0)
                 .version(0L)
                 .createdAt(now)
                 .updatedAt(now)

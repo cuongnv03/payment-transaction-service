@@ -28,7 +28,8 @@ public class TransactionController {
     private final CreateTransactionUseCase createTransactionUseCase;
 
     /**
-     * Creates a new transaction and updates the account balance atomically.
+     * Creates a P2P transaction: debits the sender's account and creates a PENDING record.
+     * The Kafka consumer credits the receiver's account on SUCCESS (async, Task 12).
      *
      * <p>The {@code Idempotency-Key} header is required. Submitting the same key
      * twice returns the original 201 response without re-executing the operation.
@@ -45,8 +46,8 @@ public class TransactionController {
         TransactionResult result = createTransactionUseCase.createTransaction(
                 new CreateTransactionCommand(
                         userId,
+                        request.toAccountId(),
                         request.amount(),
-                        request.type(),
                         request.description(),
                         idempotencyKey));
 
@@ -56,17 +57,17 @@ public class TransactionController {
     private TransactionResponse toResponse(TransactionResult r) {
         return new TransactionResponse(
                 r.id().toString(),
-                r.userId().toString(),
-                r.accountId().toString(),
+                r.fromAccountId().toString(),
+                r.toAccountId().toString(),
                 r.amount(),
                 r.currency(),
-                r.type(),
                 r.status(),
                 r.description(),
                 r.gatewayReference(),
                 r.failureReason(),
+                r.retryCount(),
                 r.processedAt() != null ? r.processedAt().toString() : null,
-                r.refundedAt() != null ? r.refundedAt().toString() : null,
+                r.refundedAt()  != null ? r.refundedAt().toString()  : null,
                 r.createdAt().toString(),
                 r.updatedAt().toString());
     }

@@ -25,21 +25,21 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
-    public Optional<Transaction> findByIdAndUserId(UUID id, UUID userId) {
-        return jpaRepository.findByIdAndUserId(id, userId).map(TransactionMapper::toDomain);
+    public Optional<Transaction> findByIdAndFromAccountId(UUID id, UUID fromAccountId) {
+        return jpaRepository.findByIdAndFromAccountId(id, fromAccountId).map(TransactionMapper::toDomain);
     }
 
     @Override
-    public List<Transaction> findByUserId(UUID userId, int page, int size) {
+    public List<Transaction> findByFromAccountId(UUID fromAccountId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return jpaRepository.findByUserId(userId, pageable)
+        return jpaRepository.findByFromAccountId(fromAccountId, pageable)
                 .map(TransactionMapper::toDomain)
                 .toList();
     }
 
     @Override
-    public long countByUserId(UUID userId) {
-        return jpaRepository.countByUserId(userId);
+    public long countByFromAccountId(UUID fromAccountId) {
+        return jpaRepository.countByFromAccountId(fromAccountId);
     }
 
     @Override

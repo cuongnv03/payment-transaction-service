@@ -1,7 +1,6 @@
 package dev.cuong.payment.infrastructure.persistence.entity;
 
 import dev.cuong.payment.domain.vo.TransactionStatus;
-import dev.cuong.payment.domain.vo.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,21 +21,17 @@ public class TransactionJpaEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    @Column(name = "from_account_id", nullable = false)
+    private UUID fromAccountId;
 
-    @Column(name = "account_id", nullable = false)
-    private UUID accountId;
+    @Column(name = "to_account_id", nullable = false)
+    private UUID toAccountId;
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
     @Column(nullable = false, length = 3)
     private String currency;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private TransactionType type;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -51,8 +46,11 @@ public class TransactionJpaEntity {
     @Column(name = "gateway_reference", length = 255)
     private String gatewayReference;
 
-    @Column(name = "failure_reason", columnDefinition = "TEXT")
+    @Column(name = "failure_reason", length = 1000)
     private String failureReason;
+
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
 
     @Version
     private Long version;

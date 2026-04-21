@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,117 +44,123 @@ class TransactionCreationIntegrationTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @Autowired AccountRepository accountRepository;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private AccountRepository accountRepository;
-
-    // ── DEPOSIT ──────────────────────────────────────────────────────────────
+    // ── Happy path ────────────────────────────────────────────────────────────
 
     @Test
-    void should_create_deposit_and_credit_account() throws Exception {
-        String token = registerAndGetToken("alice", "alice@test.com", "password123");
+    void should_create_transaction_and_debit_sender_when_funds_are_sufficient() throws Exception {
+        String senderToken   = registerAndGetToken("alice", "alice@test.com", "password123");
+        String receiverToken = registerAndGetToken("bob",   "bob@test.com",   "password123");
+
+        UUID senderUserId   = extractUserId(senderToken);
+        UUID receiverUserId = extractUserId(receiverToken);
+        UUID toAccountId    = accountRepository.findByUserId(receiverUserId).orElseThrow().getId();
+
+        fundAccount(senderUserId, new BigDecimal("1000.00"));
 
         mockMvc.perform(post("/api/transactions")
-                        .header("Authorization", "Bearer " + token)
+                        .header("Authorization", "Bearer " + senderToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("500.00", "DEPOSIT", "Initial deposit")))
+                        .content(txBody(toAccountId, "250.00", "Test payment")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.type").value("DEPOSIT"))
-                .andExpect(jsonPath("$.amount").value(500.00))
+                .andExpect(jsonPath("$.amount").value(250.00))
                 .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.id").isNotEmpty());
-    }
+                .andExpect(jsonPath("$.fromAccountId").isNotEmpty())
+                .andExpect(jsonPath("$.toAccountId").value(toAccountId.toString()));
 
-    // ── PAYMENT ───────────────────────────────────────────────────────────────
+        Account sender = accountRepository.findByUserId(senderUserId).orElseThrow();
+        assertThat(sender.getBalance()).isEqualByComparingTo("750.00");
 
-    @Test
-    void should_create_payment_and_debit_account_when_funds_are_sufficient() throws Exception {
-        String token = registerAndGetToken("bob", "bob@test.com", "password123");
-        UUID userId = extractUserId(token);
-        fundAccount(userId, new BigDecimal("1000.00"));
-
-        mockMvc.perform(post("/api/transactions")
-                        .header("Authorization", "Bearer " + token)
-                        .header("Idempotency-Key", UUID.randomUUID().toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("250.00", "PAYMENT", "Netflix subscription")))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.type").value("PAYMENT"))
-                .andExpect(jsonPath("$.amount").value(250.00));
-
-        // Balance should now be 750.00
-        Account account = accountRepository.findByUserId(userId).orElseThrow();
-        assertThat(account.getBalance()).isEqualByComparingTo("750.00");
+        // Receiver balance unchanged until consumer credits on SUCCESS (Task 12)
+        Account receiver = accountRepository.findByUserId(receiverUserId).orElseThrow();
+        assertThat(receiver.getBalance()).isEqualByComparingTo("0.00");
     }
 
     // ── Idempotency ───────────────────────────────────────────────────────────
 
     @Test
     void should_return_cached_result_when_idempotency_key_is_reused() throws Exception {
-        String token = registerAndGetToken("carol", "carol@test.com", "password123");
-        UUID userId = extractUserId(token);
-        fundAccount(userId, new BigDecimal("1000.00"));
+        String senderToken   = registerAndGetToken("carol", "carol@test.com", "password123");
+        String receiverToken = registerAndGetToken("dave",  "dave@test.com",  "password123");
+        UUID senderUserId    = extractUserId(senderToken);
+        UUID toAccountId     = accountRepository.findByUserId(extractUserId(receiverToken)).orElseThrow().getId();
+
+        fundAccount(senderUserId, new BigDecimal("1000.00"));
 
         String key = UUID.randomUUID().toString();
 
         MvcResult first = mockMvc.perform(post("/api/transactions")
-                        .header("Authorization", "Bearer " + token)
+                        .header("Authorization", "Bearer " + senderToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("100.00", "PAYMENT", "First attempt")))
+                        .content(txBody(toAccountId, "100.00", "First attempt")))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         MvcResult second = mockMvc.perform(post("/api/transactions")
-                        .header("Authorization", "Bearer " + token)
+                        .header("Authorization", "Bearer " + senderToken)
                         .header("Idempotency-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("100.00", "PAYMENT", "Second attempt")))
+                        .content(txBody(toAccountId, "100.00", "Retry")))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         String firstId  = objectMapper.readTree(first.getResponse().getContentAsString()).get("id").asText();
         String secondId = objectMapper.readTree(second.getResponse().getContentAsString()).get("id").asText();
-
         assertThat(firstId).isEqualTo(secondId);
 
-        // Balance should only be deducted once
-        Account account = accountRepository.findByUserId(userId).orElseThrow();
-        assertThat(account.getBalance()).isEqualByComparingTo("900.00");
+        // Balance deducted only once
+        assertThat(accountRepository.findByUserId(senderUserId).orElseThrow().getBalance())
+                .isEqualByComparingTo("900.00");
     }
 
     // ── Error cases ───────────────────────────────────────────────────────────
 
     @Test
-    void should_reject_payment_when_balance_is_insufficient() throws Exception {
-        String token = registerAndGetToken("dave", "dave@test.com", "password123");
-        // New user has 0 balance — any payment should fail
+    void should_reject_when_sender_has_insufficient_funds() throws Exception {
+        String senderToken   = registerAndGetToken("eve",  "eve@test.com",  "password123");
+        String receiverToken = registerAndGetToken("fred", "fred@test.com", "password123");
+        UUID toAccountId     = accountRepository.findByUserId(extractUserId(receiverToken)).orElseThrow().getId();
+        // Sender has 0 balance — any payment must fail
 
         mockMvc.perform(post("/api/transactions")
-                        .header("Authorization", "Bearer " + token)
+                        .header("Authorization", "Bearer " + senderToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("100.00", "PAYMENT", null)))
+                        .content(txBody(toAccountId, "100.00", null)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS"));
     }
 
     @Test
+    void should_reject_transfer_to_own_account() throws Exception {
+        String token  = registerAndGetToken("grace", "grace@test.com", "password123");
+        UUID userId   = extractUserId(token);
+        UUID ownAccId = accountRepository.findByUserId(userId).orElseThrow().getId();
+        fundAccount(userId, new BigDecimal("500.00"));
+
+        mockMvc.perform(post("/api/transactions")
+                        .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(txBody(ownAccId, "100.00", null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SAME_ACCOUNT_TRANSFER"));
+    }
+
+    @Test
     void should_reject_when_idempotency_key_header_is_missing() throws Exception {
-        String token = registerAndGetToken("eve", "eve@test.com", "password123");
+        String token = registerAndGetToken("henry", "henry@test.com", "password123");
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("50.00", "DEPOSIT", null)))
+                        .content(txBody(UUID.randomUUID(), "50.00", null)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MISSING_HEADER"));
     }
@@ -163,26 +170,26 @@ class TransactionCreationIntegrationTest {
         mockMvc.perform(post("/api/transactions")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("50.00", "DEPOSIT", null)))
+                        .content(txBody(UUID.randomUUID(), "50.00", null)))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void should_reject_when_amount_is_zero_or_negative() throws Exception {
-        String token = registerAndGetToken("frank", "frank@test.com", "password123");
+    void should_reject_when_amount_is_negative() throws Exception {
+        String token = registerAndGetToken("ivy", "ivy@test.com", "password123");
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + token)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(transactionBody("-50.00", "DEPOSIT", null)))
+                        .content(txBody(UUID.randomUUID(), "-50.00", null)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     @Test
-    void should_reject_when_type_is_missing() throws Exception {
-        String token = registerAndGetToken("grace", "grace@test.com", "password123");
+    void should_reject_when_to_account_id_is_missing() throws Exception {
+        String token = registerAndGetToken("jack", "jack@test.com", "password123");
 
         mockMvc.perform(post("/api/transactions")
                         .header("Authorization", "Bearer " + token)
@@ -202,20 +209,15 @@ class TransactionCreationIntegrationTest {
                                 new RegisterRequest(username, email, password))))
                 .andExpect(status().isCreated())
                 .andReturn();
-
-        return objectMapper.readTree(result.getResponse().getContentAsString())
-                .get("token").asText();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
     }
 
     private UUID extractUserId(String token) throws Exception {
-        MvcResult result = mockMvc.perform(
-                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                                .get("/api/users/me")
-                                .header("Authorization", "Bearer " + token))
+        MvcResult result = mockMvc.perform(get("/api/users/me")
+                        .header("Authorization", "Bearer " + token))
                 .andReturn();
         return UUID.fromString(
-                objectMapper.readTree(result.getResponse().getContentAsString())
-                        .get("id").asText());
+                objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
 
     private void fundAccount(UUID userId, BigDecimal amount) {
@@ -224,10 +226,10 @@ class TransactionCreationIntegrationTest {
         accountRepository.save(account);
     }
 
-    private String transactionBody(String amount, String type, String description) throws Exception {
+    private String txBody(UUID toAccountId, String amount, String description) throws Exception {
         var node = objectMapper.createObjectNode();
+        node.put("toAccountId", toAccountId.toString());
         node.put("amount", new java.math.BigDecimal(amount));
-        node.put("type", type);
         if (description != null) node.put("description", description);
         return objectMapper.writeValueAsString(node);
     }
