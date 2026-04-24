@@ -7,7 +7,9 @@ import dev.cuong.payment.application.port.in.CreateTransactionUseCase;
 import dev.cuong.payment.application.port.in.GetTransactionUseCase;
 import dev.cuong.payment.application.port.in.RefundTransactionUseCase;
 import dev.cuong.payment.application.port.out.AccountRepository;
+import dev.cuong.payment.application.port.out.EventPublisher;
 import dev.cuong.payment.application.port.out.TransactionRepository;
+import dev.cuong.payment.domain.event.TransactionEventType;
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
 import dev.cuong.payment.domain.exception.SameAccountTransferException;
 import dev.cuong.payment.domain.exception.TransactionNotFoundException;
@@ -31,6 +33,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
+    private final EventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -79,6 +82,8 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
 
         log.info("Transaction created: transactionId={}, fromAccountId={}, toAccountId={}, amount={}",
                 saved.getId(), fromAccount.getId(), toAccount.getId(), command.amount());
+
+        eventPublisher.publish(saved, TransactionEventType.CREATED);
 
         return toResult(saved);
     }
@@ -144,6 +149,8 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
 
         log.info("Refund processed: transactionId={}, fromAccountId={}, amount={}",
                 transactionId, fromAccountId, transaction.getAmount());
+
+        eventPublisher.publish(transaction, TransactionEventType.REFUNDED);
 
         return toResult(transaction);
     }
