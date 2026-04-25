@@ -124,8 +124,10 @@ resilience4j:
         max-attempts: 3
         wait-duration: 1s
         exponential-backoff-multiplier: 2.0   # 1s → 2s → 4s
-        # retry-exceptions and ignore-exceptions reference gateway exception classes
-        # created in Task 12 — wired in at that point
+        retry-exceptions:
+          - dev.cuong.payment.domain.exception.PaymentGatewayTimeoutException
+        ignore-exceptions:
+          - dev.cuong.payment.domain.exception.PaymentGatewayException
 
 # ── Logging ─────────────────────────────────────────────────────────────────────
 logging:
