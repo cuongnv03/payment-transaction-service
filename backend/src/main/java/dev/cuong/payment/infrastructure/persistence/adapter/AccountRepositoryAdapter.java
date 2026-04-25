@@ -32,6 +32,11 @@ public class AccountRepositoryAdapter implements AccountRepository {
     }
 
     @Override
+    public Optional<Account> findByIdForUpdate(UUID accountId) {
+        return jpaRepository.findByIdWithLock(accountId).map(AccountMapper::toDomain);
+    }
+
+    @Override
     public Account save(Account account) {
         return AccountMapper.toDomain(jpaRepository.save(AccountMapper.toEntity(account)));
     }

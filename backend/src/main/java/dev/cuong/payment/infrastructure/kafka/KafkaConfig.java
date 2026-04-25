@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 
 /**
  * Kafka topic declarations and {@link EventPublisher} wiring.
@@ -47,6 +49,17 @@ public class KafkaConfig {
                 .partitions(1)
                 .replicas(1)
                 .build();
+    }
+
+    /**
+     * Retries failed consumer records up to 2 times with a 1-second delay before
+     * the record is logged and discarded (or forwarded to DLQ in Task 15).
+     * {@link org.springframework.dao.OptimisticLockingFailureException} is caught inside
+     * the consumer and never propagates here — only truly unexpected failures retry.
+     */
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler() {
+        return new DefaultErrorHandler(new FixedBackOff(1000L, 2L));
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

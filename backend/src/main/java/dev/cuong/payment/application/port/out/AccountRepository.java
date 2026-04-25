@@ -25,5 +25,12 @@ public interface AccountRepository {
      */
     Optional<Account> findByUserIdForUpdate(UUID userId);
 
+    /**
+     * Finds the account by its own ID and acquires a pessimistic write lock.
+     * Used by the Kafka consumer which has an {@code accountId} from the event message,
+     * not a {@code userId} from the JWT context.
+     */
+    Optional<Account> findByIdForUpdate(UUID accountId);
+
     Account save(Account account);
 }

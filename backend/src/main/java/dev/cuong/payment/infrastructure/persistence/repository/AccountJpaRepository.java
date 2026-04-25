@@ -14,9 +14,12 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, UU
 
     Optional<AccountJpaEntity> findByUserId(UUID userId);
 
-    // PESSIMISTIC_WRITE → SELECT ... FOR UPDATE. Must be called within
-    // an active @Transactional boundary or PostgreSQL will reject the lock mode.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM AccountJpaEntity a WHERE a.userId = :userId")
     Optional<AccountJpaEntity> findByUserIdWithLock(@Param("userId") UUID userId);
+
+    // Consumer uses accountId (from event message), not userId (from JWT).
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM AccountJpaEntity a WHERE a.id = :id")
+    Optional<AccountJpaEntity> findByIdWithLock(@Param("id") UUID id);
 }
