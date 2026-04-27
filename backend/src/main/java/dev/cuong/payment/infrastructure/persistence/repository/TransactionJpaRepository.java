@@ -22,4 +22,9 @@ public interface TransactionJpaRepository extends JpaRepository<TransactionJpaEn
     long countByFromAccountIdAndStatus(UUID fromAccountId, TransactionStatus status);
 
     Optional<TransactionJpaEntity> findByIdempotencyKey(String idempotencyKey);
+
+    // Admin-scoped queries — not filtered by fromAccountId
+    Page<TransactionJpaEntity> findByStatus(TransactionStatus status, Pageable pageable);
+
+    long countByStatus(TransactionStatus status);
 }

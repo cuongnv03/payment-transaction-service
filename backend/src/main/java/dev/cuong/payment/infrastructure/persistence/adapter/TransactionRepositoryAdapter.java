@@ -65,4 +65,30 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     public Transaction save(Transaction transaction) {
         return TransactionMapper.toDomain(jpaRepository.save(TransactionMapper.toEntity(transaction)));
     }
+
+    @Override
+    public List<Transaction> findAllTransactions(int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return jpaRepository.findAll(pageable)
+                .map(TransactionMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Transaction> findAllTransactionsByStatus(TransactionStatus status, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return jpaRepository.findByStatus(status, pageable)
+                .map(TransactionMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countAllTransactions() {
+        return jpaRepository.count();
+    }
+
+    @Override
+    public long countAllTransactionsByStatus(TransactionStatus status) {
+        return jpaRepository.countByStatus(status);
+    }
 }
