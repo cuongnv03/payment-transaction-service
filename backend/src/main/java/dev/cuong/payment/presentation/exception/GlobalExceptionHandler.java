@@ -1,6 +1,8 @@
 package dev.cuong.payment.presentation.exception;
 
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
+import dev.cuong.payment.domain.exception.DlqEventNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import dev.cuong.payment.domain.exception.InvalidCredentialsException;
 import dev.cuong.payment.domain.exception.InvalidTransactionStateException;
 import dev.cuong.payment.domain.exception.TransactionNotFoundException;
@@ -42,7 +44,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiError("INVALID_CREDENTIALS", e.getMessage()));
     }
 
-    @ExceptionHandler({TransactionNotFoundException.class, AccountNotFoundException.class, UserNotFoundException.class})
+    @ExceptionHandler({
+            TransactionNotFoundException.class,
+            AccountNotFoundException.class,
+            UserNotFoundException.class,
+            DlqEventNotFoundException.class
+    })
     public ResponseEntity<ApiError> handleNotFound(Exception e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError("NOT_FOUND", e.getMessage()));
@@ -101,6 +108,12 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest()
                 .body(new ApiError("VALIDATION_ERROR", message));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError("ACCESS_DENIED", "You do not have permission to access this resource"));
     }
 
     @ExceptionHandler(Exception.class)

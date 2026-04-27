@@ -31,4 +31,16 @@ public interface TransactionRepository {
     Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
 
     Transaction save(Transaction transaction);
+
+    // ── Admin-scoped methods (not filtered by fromAccountId) ──────────────────
+
+    /** Returns all transactions across all users, newest first. */
+    List<Transaction> findAllTransactions(int page, int size);
+
+    /** Returns all transactions for a given status across all users, newest first. */
+    List<Transaction> findAllTransactionsByStatus(TransactionStatus status, int page, int size);
+
+    long countAllTransactions();
+
+    long countAllTransactionsByStatus(TransactionStatus status);
 }
