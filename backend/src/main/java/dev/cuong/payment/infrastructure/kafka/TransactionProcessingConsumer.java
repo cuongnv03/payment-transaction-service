@@ -4,6 +4,7 @@ import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.DistributedLockPort;
 import dev.cuong.payment.application.port.out.EventPublisher;
 import dev.cuong.payment.application.port.out.PaymentGatewayPort;
+import dev.cuong.payment.application.port.out.TransactionMetricsPort;
 import dev.cuong.payment.application.port.out.TransactionRepository;
 import dev.cuong.payment.domain.event.TransactionEventType;
 import dev.cuong.payment.domain.exception.PaymentGatewayException;
@@ -23,6 +24,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -58,6 +61,7 @@ public class TransactionProcessingConsumer {
     private final PaymentGatewayPort paymentGateway;
     private final DistributedLockPort distributedLock;
     private final EventPublisher eventPublisher;
+    private final TransactionMetricsPort metrics;
     private final PlatformTransactionManager transactionManager;
 
     // TransactionTemplate is derived from transactionManager — not a Spring bean itself.
@@ -124,25 +128,35 @@ public class TransactionProcessingConsumer {
         // ── Phase 2: Gateway call + finalisation ──────────────────────────────
         // Runs OUTSIDE any DB transaction — the gateway call is an IO operation
         // and should not hold a DB connection open for its duration.
+        // Timer starts after Phase 1 so we measure gateway+finalisation latency,
+        // not DB-only "still PENDING" overhead.
+        Instant start = Instant.now();
+        TransactionStatus terminalStatus;
         try {
             String gatewayRef = paymentGateway.charge(tx.getId(), tx.getAmount());
             finaliseSuccess(tx.getId(), tx.getToAccountId(), tx.getAmount(), gatewayRef);
+            terminalStatus = TransactionStatus.SUCCESS;
 
         } catch (PaymentGatewayTimeoutException e) {
             log.warn("Gateway timeout after retries — marking TIMEOUT: transactionId={}", transactionId);
             finaliseFailure(tx.getId(), tx.getFromAccountId(), tx.getAmount(), TransactionStatus.TIMEOUT,
                     "Gateway timeout after retries");
+            terminalStatus = TransactionStatus.TIMEOUT;
 
         } catch (PaymentGatewayException e) {
             log.warn("Gateway rejected payment — marking FAILED: transactionId={}, reason={}", transactionId, e.getMessage());
             finaliseFailure(tx.getId(), tx.getFromAccountId(), tx.getAmount(), TransactionStatus.FAILED,
                     e.getMessage());
+            terminalStatus = TransactionStatus.FAILED;
 
         } catch (CallNotPermittedException e) {
             log.error("Circuit breaker OPEN — marking FAILED: transactionId={}", transactionId);
             finaliseFailure(tx.getId(), tx.getFromAccountId(), tx.getAmount(), TransactionStatus.FAILED,
                     "Payment gateway unavailable (circuit breaker open)");
+            terminalStatus = TransactionStatus.FAILED;
         }
+
+        metrics.recordProcessed(terminalStatus.name(), Duration.between(start, Instant.now()));
     }
 
     private void finaliseSuccess(UUID transactionId, UUID toAccountId, BigDecimal amount, String gatewayRef) {
