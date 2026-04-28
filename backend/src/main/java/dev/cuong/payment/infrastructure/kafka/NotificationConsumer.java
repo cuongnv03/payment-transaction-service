@@ -1,6 +1,7 @@
 package dev.cuong.payment.infrastructure.kafka;
 
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -25,13 +26,18 @@ public class NotificationConsumer {
             groupId = "notification"
     )
     public void onTransactionEvent(TransactionEventMessage event) {
-        switch (event.eventType()) {
-            case CREATED    -> notifyInitiated(event);
-            case PROCESSING -> notifyProcessing(event);
-            case SUCCESS    -> notifySucceeded(event);
-            case FAILED     -> notifyFailed(event);
-            case TIMEOUT    -> notifyTimedOut(event);
-            case REFUNDED   -> notifyRefunded(event);
+        MDC.put("transactionId", event.transactionId().toString());
+        try {
+            switch (event.eventType()) {
+                case CREATED    -> notifyInitiated(event);
+                case PROCESSING -> notifyProcessing(event);
+                case SUCCESS    -> notifySucceeded(event);
+                case FAILED     -> notifyFailed(event);
+                case TIMEOUT    -> notifyTimedOut(event);
+                case REFUNDED   -> notifyRefunded(event);
+            }
+        } finally {
+            MDC.remove("transactionId");
         }
     }
 
