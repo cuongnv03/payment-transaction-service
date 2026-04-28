@@ -8,6 +8,7 @@ import dev.cuong.payment.application.port.in.GetTransactionUseCase;
 import dev.cuong.payment.application.port.in.RefundTransactionUseCase;
 import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.EventPublisher;
+import dev.cuong.payment.application.port.out.TransactionMetricsPort;
 import dev.cuong.payment.application.port.out.TransactionRepository;
 import dev.cuong.payment.domain.event.TransactionEventType;
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
@@ -34,6 +35,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final EventPublisher eventPublisher;
+    private final TransactionMetricsPort metrics;
 
     @Override
     @Transactional
@@ -84,6 +86,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
                 saved.getId(), fromAccount.getId(), toAccount.getId(), command.amount());
 
         eventPublisher.publish(saved, TransactionEventType.CREATED);
+        metrics.recordCreated();
 
         return toResult(saved);
     }

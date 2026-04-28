@@ -76,6 +76,12 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      # Emit native Prometheus histogram buckets — required for histogram_quantile() in Grafana
+      percentiles-histogram:
+        transactions.processing.duration: true
+      percentiles:
+        transactions.processing.duration: 0.5, 0.95, 0.99
   prometheus:
     metrics:
       export:
