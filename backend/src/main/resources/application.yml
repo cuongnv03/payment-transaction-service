@@ -136,9 +136,6 @@ resilience4j:
           - dev.cuong.payment.domain.exception.PaymentGatewayException
 
 # ── Logging ─────────────────────────────────────────────────────────────────────
-logging:
-  level:
-    dev.cuong.payment: INFO
-    org.springframework.security: WARN
-    org.hibernate.SQL: WARN
-    org.apache.kafka: WARN
+# Logger levels and encoder format are configured in logback-spring.xml so that
+# JSON encoding (production) vs human-readable encoding (local profile) can be
+# switched per Spring profile in one place.

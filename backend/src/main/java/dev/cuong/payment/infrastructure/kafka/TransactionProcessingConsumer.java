@@ -17,6 +17,7 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -82,23 +83,26 @@ public class TransactionProcessingConsumer {
         }
 
         UUID transactionId = message.transactionId();
+        MDC.put("transactionId", transactionId.toString());
         String lockKey = LOCK_PREFIX + transactionId;
 
         boolean locked = distributedLock.tryLock(lockKey, 0, LOCK_LEASE_SECONDS);
         if (!locked) {
-            log.warn("Could not acquire processing lock — another instance is handling: transactionId={}", transactionId);
+            log.warn("Could not acquire processing lock — another instance is handling");
+            MDC.remove("transactionId");
             return;
         }
 
         try {
             process(transactionId);
         } catch (OptimisticLockingFailureException e) {
-            log.warn("Optimistic lock conflict — transaction already processed by another instance: transactionId={}", transactionId);
+            log.warn("Optimistic lock conflict — transaction already processed by another instance");
         } catch (Exception e) {
-            log.error("Unexpected error processing transaction: transactionId={}, error={}", transactionId, e.getMessage(), e);
+            log.error("Unexpected error processing transaction: error={}", e.getMessage(), e);
             throw e; // propagate so Kafka retries via DefaultErrorHandler
         } finally {
             distributedLock.unlock(lockKey);
+            MDC.remove("transactionId");
         }
     }
 

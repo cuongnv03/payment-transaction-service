@@ -7,6 +7,7 @@ import dev.cuong.payment.application.port.out.AuditRepository;
 import dev.cuong.payment.domain.model.Account;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,8 +49,11 @@ public class AuditConsumer {
     )
     @Transactional
     public void onTransactionEvent(TransactionEventMessage event) {
+        MDC.put("transactionId", event.transactionId().toString());
         try {
             UUID userId = resolveUserId(event);
+            MDC.put("userId", userId.toString());
+
             String metadata = buildMetadata(event);
 
             auditRepository.record(new AuditRepository.AuditEntry(
@@ -60,13 +64,15 @@ public class AuditConsumer {
                     metadata
             ));
 
-            log.info("[AUDIT] Recorded: transactionId={}, eventType={}, userId={}",
-                    event.transactionId(), event.eventType(), userId);
+            log.info("[AUDIT] Recorded: eventType={}", event.eventType());
 
         } catch (Exception e) {
-            log.error("[AUDIT] Failed to record event — will retry: transactionId={}, eventType={}, error={}",
-                    event.transactionId(), event.eventType(), e.getMessage(), e);
+            log.error("[AUDIT] Failed to record event — will retry: eventType={}, error={}",
+                    event.eventType(), e.getMessage(), e);
             throw e;
+        } finally {
+            MDC.remove("transactionId");
+            MDC.remove("userId");
         }
     }
 
