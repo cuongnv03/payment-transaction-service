@@ -19,7 +19,7 @@ function renderRegister() {
     <MemoryRouter initialEntries={['/register']}>
       <Routes>
         <Route path="/register" element={<Register />} />
-        <Route path="/home" element={<div>HOME PAGE</div>} />
+        <Route path="/dashboard" element={<div>DASHBOARD PAGE</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -43,7 +43,7 @@ describe('Register', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('HOME PAGE')).toBeInTheDocument();
+      expect(screen.getByText('DASHBOARD PAGE')).toBeInTheDocument();
     });
 
     expect(mockedRegister).toHaveBeenCalledWith({
