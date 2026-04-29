@@ -19,7 +19,7 @@ function renderLogin(initialEntries: string[] = ['/login']) {
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/home" element={<div>HOME PAGE</div>} />
+        <Route path="/dashboard" element={<div>DASHBOARD PAGE</div>} />
         <Route path="/admin" element={<div>ADMIN PAGE</div>} />
       </Routes>
     </MemoryRouter>,
@@ -43,7 +43,7 @@ describe('Login', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('HOME PAGE')).toBeInTheDocument();
+      expect(screen.getByText('DASHBOARD PAGE')).toBeInTheDocument();
     });
 
     expect(mockedLogin).toHaveBeenCalledWith({
@@ -89,7 +89,7 @@ describe('Login', () => {
       >
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/home" element={<div>HOME PAGE</div>} />
+          <Route path="/dashboard" element={<div>DASHBOARD PAGE</div>} />
           <Route path="/admin" element={<div>ADMIN PAGE</div>} />
         </Routes>
       </MemoryRouter>,

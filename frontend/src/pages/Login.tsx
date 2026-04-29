@@ -4,18 +4,6 @@ import { authApi } from '@/api/authApi';
 import { toApiError } from '@/api/client';
 import { useAuthStore } from '@/store/auth';
 
-const formStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.75rem',
-  maxWidth: 320,
-};
-
-const errorStyle: React.CSSProperties = {
-  color: 'crimson',
-  marginTop: '0.5rem',
-};
-
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,7 +15,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   // Where the user was trying to go before being bounced to /login.
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/home';
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/dashboard';
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,9 +33,9 @@ export default function Login() {
   }
 
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem' }}>
+    <main className="page page--narrow">
       <h1>Sign in</h1>
-      <form onSubmit={handleSubmit} style={formStyle} aria-label="login form">
+      <form onSubmit={handleSubmit} className="form" aria-label="login form">
         <label>
           Username
           <input
@@ -80,12 +68,12 @@ export default function Login() {
       </form>
 
       {error && (
-        <p style={errorStyle} role="alert">
+        <p className="form__error" role="alert">
           {error}
         </p>
       )}
 
-      <p style={{ marginTop: '1.5rem' }}>
+      <p className="form__footer">
         No account yet? <Link to="/register">Create one</Link>
       </p>
     </main>
