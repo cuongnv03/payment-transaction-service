@@ -1,0 +1,180 @@
+/* Global stylesheet — kept intentionally small; introduce CSS Modules or a
+ * framework only when component count makes this hard to maintain. */
+
+:root {
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+  --color-text-faint: #9ca3af;
+  --color-error-bg: #fee2e2;
+  --color-error-fg: #b91c1c;
+  --color-error-text: crimson;
+  --color-table-head: #f9fafb;
+  --color-border: #e5e7eb;
+
+  --status-pending-bg: #fff3cd;
+  --status-pending-fg: #856404;
+  --status-processing-bg: #cce5ff;
+  --status-processing-fg: #004085;
+  --status-success-bg: #d4edda;
+  --status-success-fg: #155724;
+  --status-failed-bg: #f8d7da;
+  --status-failed-fg: #721c24;
+  --status-refunded-bg: #e2e3e5;
+  --status-refunded-fg: #383d41;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: var(--color-text);
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 2rem;
+}
+
+.page--narrow {
+  max-width: 320px;
+}
+
+.page--wide {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.page__section {
+  margin-top: 2rem;
+}
+
+.page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 320px;
+}
+
+.form__error {
+  color: var(--color-error-text);
+  margin-top: 0.5rem;
+}
+
+.form__footer {
+  margin-top: 1.5rem;
+}
+
+/* ── Banner / alert ──────────────────────────────────────────────────────── */
+
+.banner-error {
+  color: var(--color-error-fg);
+  background-color: var(--color-error-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+/* ── Status badge ────────────────────────────────────────────────────────── */
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.status-badge[data-status='PENDING'] {
+  background-color: var(--status-pending-bg);
+  color: var(--status-pending-fg);
+}
+.status-badge[data-status='PROCESSING'] {
+  background-color: var(--status-processing-bg);
+  color: var(--status-processing-fg);
+}
+.status-badge[data-status='SUCCESS'] {
+  background-color: var(--status-success-bg);
+  color: var(--status-success-fg);
+}
+.status-badge[data-status='FAILED'],
+.status-badge[data-status='TIMEOUT'] {
+  background-color: var(--status-failed-bg);
+  color: var(--status-failed-fg);
+}
+.status-badge[data-status='REFUNDED'] {
+  background-color: var(--status-refunded-bg);
+  color: var(--status-refunded-fg);
+}
+
+/* ── Transactions table ──────────────────────────────────────────────────── */
+
+.tx-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tx-table th,
+.tx-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tx-table th {
+  background-color: var(--color-table-head);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.tx-table__empty {
+  color: var(--color-text-muted);
+}
+
+.tx-table__missing {
+  color: var(--color-text-faint);
+}
+
+/* ── Section header (h2 + action button on the same row) ──────────────────── */
+
+.section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Modal (native <dialog>) ──────────────────────────────────────────────── */
+
+.modal {
+  border: none;
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 360px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.modal::backdrop {
+  background-color: rgba(17, 24, 39, 0.45);
+}
+
+.modal h2 {
+  margin-top: 0;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

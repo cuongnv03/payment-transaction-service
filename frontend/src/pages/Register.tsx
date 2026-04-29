@@ -4,18 +4,6 @@ import { authApi } from '@/api/authApi';
 import { toApiError } from '@/api/client';
 import { useAuthStore } from '@/store/auth';
 
-const formStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.75rem',
-  maxWidth: 320,
-};
-
-const errorStyle: React.CSSProperties = {
-  color: 'crimson',
-  marginTop: '0.5rem',
-};
-
 export default function Register() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -35,7 +23,7 @@ export default function Register() {
       // straight into the authenticated state.
       const auth = await authApi.register({ username, email, password });
       setAuth(auth);
-      navigate('/home', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(toApiError(err).message);
     } finally {
@@ -44,9 +32,9 @@ export default function Register() {
   }
 
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem' }}>
+    <main className="page page--narrow">
       <h1>Create account</h1>
-      <form onSubmit={handleSubmit} style={formStyle} aria-label="register form">
+      <form onSubmit={handleSubmit} className="form" aria-label="register form">
         <label>
           Username
           <input
@@ -91,12 +79,12 @@ export default function Register() {
       </form>
 
       {error && (
-        <p style={errorStyle} role="alert">
+        <p className="form__error" role="alert">
           {error}
         </p>
       )}
 
-      <p style={{ marginTop: '1.5rem' }}>
+      <p className="form__footer">
         Already registered? <Link to="/login">Sign in</Link>
       </p>
     </main>

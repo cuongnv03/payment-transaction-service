@@ -46,10 +46,11 @@ export interface UserProfile {
 export interface Account {
   id: string;
   userId: string;
-  balance: string; // BigDecimal arrives as a JSON string to preserve precision
+  // Spring Boot's default Jackson config serializes BigDecimal as a JSON number.
+  // Precision loss only applies above Number.MAX_SAFE_INTEGER (~9 quadrillion).
+  balance: number;
   currency: string;
   createdAt: string;
-  updatedAt: string;
 }
 
 // ── Transaction ───────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ export type TransactionStatus =
 
 export interface CreateTransactionRequest {
   toAccountId: string;
-  amount: string; // BigDecimal as string
+  amount: number;
   description?: string;
 }
 
@@ -72,7 +73,7 @@ export interface Transaction {
   id: string;
   fromAccountId: string;
   toAccountId: string;
-  amount: string;
+  amount: number;
   currency: string;
   status: TransactionStatus;
   description: string | null;
