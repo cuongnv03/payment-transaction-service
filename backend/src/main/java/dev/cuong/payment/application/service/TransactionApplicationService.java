@@ -10,6 +10,7 @@ import dev.cuong.payment.application.port.out.AccountRepository;
 import dev.cuong.payment.application.port.out.EventPublisher;
 import dev.cuong.payment.application.port.out.TransactionMetricsPort;
 import dev.cuong.payment.application.port.out.TransactionRepository;
+import dev.cuong.payment.application.port.out.UserAccountIdCache;
 import dev.cuong.payment.domain.event.TransactionEventType;
 import dev.cuong.payment.domain.exception.AccountNotFoundException;
 import dev.cuong.payment.domain.exception.SameAccountTransferException;
@@ -36,6 +37,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
     private final AccountRepository accountRepository;
     private final EventPublisher eventPublisher;
     private final TransactionMetricsPort metrics;
+    private final UserAccountIdCache userAccountIdCache;
 
     @Override
     @Transactional
@@ -94,9 +96,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
     @Override
     @Transactional(readOnly = true)
     public PagedResult<TransactionResult> getMyTransactions(UUID userId, TransactionStatus status, int page, int size) {
-        UUID fromAccountId = accountRepository.findByUserId(userId)
-                .orElseThrow(() -> new AccountNotFoundException(userId))
-                .getId();
+        UUID fromAccountId = resolveAccountId(userId);
 
         List<Transaction> txs;
         long total;
@@ -118,9 +118,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
     @Override
     @Transactional(readOnly = true)
     public TransactionResult getMyTransaction(UUID userId, UUID transactionId) {
-        UUID fromAccountId = accountRepository.findByUserId(userId)
-                .orElseThrow(() -> new AccountNotFoundException(userId))
-                .getId();
+        UUID fromAccountId = resolveAccountId(userId);
 
         return transactionRepository.findByIdAndFromAccountId(transactionId, fromAccountId)
                 .map(this::toResult)
@@ -130,9 +128,7 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
     @Override
     @Transactional
     public TransactionResult refundTransaction(UUID userId, UUID transactionId) {
-        UUID fromAccountId = accountRepository.findByUserId(userId)
-                .orElseThrow(() -> new AccountNotFoundException(userId))
-                .getId();
+        UUID fromAccountId = resolveAccountId(userId);
 
         // Scoped load — 404 if the transaction belongs to a different account
         Transaction transaction = transactionRepository.findByIdAndFromAccountId(transactionId, fromAccountId)
@@ -156,6 +152,22 @@ public class TransactionApplicationService implements CreateTransactionUseCase, 
         eventPublisher.publish(transaction, TransactionEventType.REFUNDED);
 
         return toResult(transaction);
+    }
+
+    /**
+     * Resolves the authenticated user's account ID. Cache-first
+     * (see {@link UserAccountIdCache}) — falls through to the DB on miss and
+     * back-fills the cache. The mapping is effectively immutable, so cache
+     * misses only happen on the first request per user (or after Redis restart).
+     */
+    private UUID resolveAccountId(UUID userId) {
+        return userAccountIdCache.get(userId).orElseGet(() -> {
+            UUID accountId = accountRepository.findByUserId(userId)
+                    .orElseThrow(() -> new AccountNotFoundException(userId))
+                    .getId();
+            userAccountIdCache.put(userId, accountId);
+            return accountId;
+        });
     }
 
     private TransactionResult toResult(Transaction tx) {
