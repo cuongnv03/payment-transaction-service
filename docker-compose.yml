@@ -155,6 +155,68 @@ services:
       retries: 5
       start_period: 15s
 
+  # ── Backend (Spring Boot JAR) ───────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: payment-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # Postgres listens on 5432 *inside* the compose network — the host-side
+      # 5434 mapping is only for direct dev access.
+      DB_URL: jdbc:postgresql://postgres:5432/payment_db
+      DB_USERNAME: ${DB_USERNAME:-payment_user}
+      DB_PASSWORD: ${DB_PASSWORD:-payment_pass}
+      # Redis is reachable as the service name; default port.
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Use Kafka's internal listener (29092) — 9092 is the external one.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Override in .env for any non-portfolio deployment.
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production-must-be-at-least-256-bits-long-for-hs256-algorithm}
+      # Sensible JVM tuning for a 1-2 GB container.
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # ── Frontend (nginx serving the React bundle) ───────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: payment-frontend
+    restart: unless-stopped
+    depends_on:
+      # service_started (not service_healthy) — nginx can serve the SPA before
+      # the backend is healthy; /api proxy calls just 502 until then. Avoids a
+      # 60 s+ wait on cold-start before the static bundle is reachable.
+      backend:
+        condition: service_started
+    ports:
+      # 3000 host → 80 in the nginx container. Backend stays on 8080 so they
+      # don't collide; nginx reverse-proxies /api and /actuator to backend:8080.
+      - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   postgres_data:
     driver: local
