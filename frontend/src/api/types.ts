@@ -101,3 +101,41 @@ export interface ApiError {
   code: string;
   message: string;
 }
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+/**
+ * One row from {@code GET /api/admin/dlq}. {@code transactionId} and
+ * {@code eventType} are pre-parsed by the backend adapter from the JSON
+ * payload; either may be {@code null} when the payload was unreadable.
+ */
+export interface DlqEvent {
+  id: string;
+  topic: string;
+  kafkaPartition: number | null;
+  kafkaOffset: number | null;
+  payload: string;
+  transactionId: string | null;
+  eventType: string | null;
+  errorMessage: string;
+  retryCount: number;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
+
+export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN' | 'DISABLED' | 'FORCED_OPEN' | 'METRICS_ONLY';
+
+/**
+ * Snapshot of {@code payment-gateway} circuit breaker. {@code failureRate}
+ * and {@code slowCallRate} are {@code -1} when the sliding window has not
+ * yet observed enough calls — the UI should render that as "—".
+ */
+export interface CircuitBreakerStatus {
+  name: string;
+  state: CircuitBreakerState;
+  failureRate: number;
+  slowCallRate: number;
+  bufferedCalls: number;
+  failedCalls: number;
+}

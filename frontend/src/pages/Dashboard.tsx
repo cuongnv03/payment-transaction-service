@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CreateTransactionModal } from '@/components/CreateTransactionModal';
 import { TransactionTable } from '@/components/TransactionTable';
 import { useAccountStore } from '@/store/account';
@@ -19,6 +19,7 @@ const POLL_INTERVAL_MS = 3000;
 export default function Dashboard() {
   const navigate = useNavigate();
   const username = useAuthStore((s) => s.username);
+  const role = useAuthStore((s) => s.role);
   const clear = useAuthStore((s) => s.clear);
 
   const account = useAccountStore((s) => s.data);
@@ -66,7 +67,10 @@ export default function Dashboard() {
     <main className="page page--wide">
       <header className="page__header">
         <h1>Welcome, {username}</h1>
-        <button type="button" onClick={handleLogout}>Sign out</button>
+        <nav className="page__header-actions">
+          {role === 'ADMIN' && <Link to="/admin">Admin panel</Link>}
+          <button type="button" onClick={handleLogout}>Sign out</button>
+        </nav>
       </header>
 
       <section className="page__section">
