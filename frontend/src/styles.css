@@ -178,3 +178,70 @@ body {
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
+
+/* ── Page header actions group ────────────────────────────────────────────── */
+
+.page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* ── Circuit breaker card ─────────────────────────────────────────────────── */
+
+.cb-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  max-width: 480px;
+  border-left-width: 4px;
+}
+
+.cb-card[data-state='CLOSED']    { border-left-color: #10b981; }
+.cb-card[data-state='HALF_OPEN'] { border-left-color: #f59e0b; }
+.cb-card[data-state='OPEN'],
+.cb-card[data-state='FORCED_OPEN'] { border-left-color: #ef4444; }
+.cb-card[data-state='DISABLED'],
+.cb-card[data-state='METRICS_ONLY'] { border-left-color: var(--color-text-muted); }
+
+.cb-card__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.cb-card__state {
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.cb-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.cb-card__metrics div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.cb-card__metrics dt {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.cb-card__metrics dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── Chart container ──────────────────────────────────────────────────────── */
+
+.chart-container {
+  width: 100%;
+  max-width: 720px;
+}
