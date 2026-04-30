@@ -10,6 +10,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Reset every vi.fn()'s call history AND queued mockResolvedValueOnce / etc.
+    // implementations between tests. Without this, mocks accumulate across the
+    // whole file and `toHaveBeenCalledTimes(N)` becomes order-dependent.
+    mockReset: true,
   },
   plugins: [react()],
   resolve: {
