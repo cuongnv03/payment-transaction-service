@@ -2,11 +2,11 @@
 
 A production-grade P2P payment service built end-to-end as a portfolio
 demonstration: Java 17 / Spring Boot 3 backend with hexagonal architecture,
-React + TypeScript frontend, and a Postgres + Redis + Kafka stack — all
+React + TypeScript frontend, and a Postgres + Redis + Kafka stack - all
 runnable on a developer machine with one command, with Prometheus metrics,
 Grafana dashboards, k6 load testing, and GitHub Actions CI.
 
-> Not a real payment network — the gateway is a configurable mock. The point
+> Not a real payment network - the gateway is a configurable mock. The point
 > is the platform around it: idempotency, distributed locking, circuit
 > breaking, dead-letter queues, observable metrics, and load-tested SLAs.
 
@@ -27,7 +27,7 @@ Screenshots will land in `docs/screenshots/` after the deployment step.
 
 ---
 
-## Local development — three commands
+## Local development - three commands
 
 ```bash
 git clone https://github.com/cuongnv03/payment-transaction-service.git
@@ -38,7 +38,7 @@ cp .env.example .env && docker compose up --build
 Wait ~60–90 s for the first build. When everything is healthy:
 
 - Open http://localhost:3000 → register a user, log in, you're on the dashboard.
-- (Optional) seed the test sender's balance for write traffic — see the
+- (Optional) seed the test sender's balance for write traffic - see the
   comment in [`load-test/transaction-load-test.js`](load-test/transaction-load-test.js).
 - Open http://localhost:3001 → the "Payment Service" Grafana dashboard
   loads automatically with throughput, error-rate, P95/P99 latency, and
@@ -97,16 +97,16 @@ docker compose down -v
 
 ### Layers (hexagonal / ports & adapters)
 
-- **`domain/`** — pure Java aggregates, value objects, exceptions. No
+- **`domain/`** - pure Java aggregates, value objects, exceptions. No
   framework imports. The `Transaction` aggregate enforces the state
   machine; the `Account` aggregate guards balance invariants.
-- **`application/`** — use case interfaces (`port/in`), outbound
+- **`application/`** - use case interfaces (`port/in`), outbound
   abstractions (`port/out`), and services that orchestrate them. All
   outbound concerns (DB, Kafka, Redis lock, metrics, cache) are ports.
-- **`infrastructure/`** — JPA repositories, Kafka producers/consumers,
+- **`infrastructure/`** - JPA repositories, Kafka producers/consumers,
   Resilience4j-decorated payment gateway, Redisson lock + cache,
   Micrometer adapter. Implements the ports.
-- **`presentation/`** — REST controllers, request/response records,
+- **`presentation/`** - REST controllers, request/response records,
   global exception handler, JWT + MDC + rate-limit filters.
 
 ---
@@ -122,7 +122,7 @@ docker compose down -v
 | Cache + lock | Redis 7 + Redisson 3.27 | Sliding-window rate limiter, distributed lock, cache |
 | Messaging | Apache Kafka 3.6 | Durable async events, consumer groups, DLQ topic |
 | Resilience | Resilience4j 2.2 | Circuit breaker + retry; fast-fail when gateway degrades |
-| Auth | JJWT 0.12 (HS256) | Stateless JWT — horizontal scaling without shared sessions |
+| Auth | JJWT 0.12 (HS256) | Stateless JWT - horizontal scaling without shared sessions |
 | Metrics | Micrometer + Prometheus + Grafana | Auto-instrumented HTTP/JVM/DB + custom business meters |
 | Logging | SLF4J + Logback + LogstashEncoder | JSON in prod (whitelisted MDC keys), human-readable in `local` |
 | Tests (BE) | JUnit 5 + Testcontainers + Awaitility + AssertJ | Real Postgres/Kafka/Redis, no mocks for infra |
@@ -148,7 +148,7 @@ transition is a domain method on the `Transaction` aggregate
 (`startProcessing()`, `complete()`, `fail()`, `timeout()`, `refund()`)
 that throws `InvalidTransactionStateException` if the current state
 isn't a valid source. No string-based status checks scattered across
-services — illegal transitions can't compile away because the methods
+services - illegal transitions can't compile away because the methods
 *are* the contract.
 
 ### Idempotency
@@ -167,14 +167,14 @@ sliding window opens the breaker; while open, calls fast-fail with
 `CallNotPermittedException`. `@Retry` is decorated *inside* the breaker,
 so a degraded gateway doesn't burn retry budget when the breaker is
 already open. State is exposed at `GET /api/admin/circuit-breaker` and as a
-Prometheus gauge — operators see degradation before users complain.
+Prometheus gauge - operators see degradation before users complain.
 
 ### Dead-letter queue
 
 When a Kafka consumer fails after retries, a custom `PersistingDlqRecoverer`
 writes the failed record to the `dead_letter_events` Postgres table
 *before* attempting to forward it to the DLQ Kafka topic. Kafka publish
-failures are caught and logged but never propagated — Spring Kafka treats
+failures are caught and logged but never propagated - Spring Kafka treats
 recoverer exceptions as "recovery failed" and would otherwise loop the
 record forever. Admins inspect the DLQ at `/api/admin/dlq` and retry via
 `POST /api/admin/dlq/{id}/retry`, which loads the original transaction
@@ -217,7 +217,7 @@ See [ADR-0001](docs/adr/0001-dlq-db-first-recovery.md).
 │           ├── dashboard.yml               provider config
 │           └── payment-service.json        five-panel dashboard
 ├── load-test/
-│   └── transaction-load-test.js   k6 — 100 VUs × 5 min, P99 < 2 s gate
+│   └── transaction-load-test.js   k6 - 100 VUs × 5 min, P99 < 2 s gate
 ├── docs/
 │   ├── DECISIONS.md                 compiled architectural decisions
 │   ├── PERFORMANCE.md               before/after performance log
@@ -236,14 +236,14 @@ See [ADR-0001](docs/adr/0001-dlq-db-first-recovery.md).
 | Suite | How to run | What it covers |
 |---|---|---|
 | Backend unit | `cd backend && ./gradlew test` | Domain logic, no Spring |
-| Backend integration | `cd backend && ./gradlew test` (same task) | Real Postgres / Kafka / Redis via Testcontainers — see `*IntegrationTest.java` |
+| Backend integration | `cd backend && ./gradlew test` (same task) | Real Postgres / Kafka / Redis via Testcontainers - see `*IntegrationTest.java` |
 | Backend E2E | _included in test_ | Full stack: register → seed → transfer → SUCCESS → refund; concurrent overdraft prevention. See [`EndToEndIntegrationTest.java`](backend/src/test/java/dev/cuong/payment/e2e/EndToEndIntegrationTest.java) |
 | Frontend | `cd frontend && npm test` | Vitest + React Testing Library; ~30 specs |
 | Load test | `k6 run load-test/transaction-load-test.js` | 100 VUs × 5 min, threshold-gated P99 < 2 s |
 
 CI runs the backend test suite + the frontend type-check + tests + build on
 every push and PR to `main`. Coverage (JaCoCo HTML) is uploaded as an
-artifact — green or red — so reviewers can read it without re-running.
+artifact - green or red - so reviewers can read it without re-running.
 
 ---
 
@@ -256,7 +256,7 @@ The k6 load profile (100 VUs over 5 minutes, 90 % read / 10 % write mix,
 - `http_req_duration p(95) < 500 ms`
 - `http_req_failed rate < 0.01` (1 % error budget; 422 excluded)
 
-Threshold breaches cause `k6 run` to exit non-zero — CI-failable.
+Threshold breaches cause `k6 run` to exit non-zero - CI-failable.
 
 Recorded before/after deltas (cache, gzip, indexes) live in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md). The post-run table is
@@ -268,7 +268,7 @@ filled in after running k6 against pre- and post-change builds.
 
 | Document | Purpose |
 |---|---|
-| [`README.md`](README.md) | This file — high-level overview and run instructions |
+| [`README.md`](README.md) | This file - high-level overview and run instructions |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Compiled architectural decisions (Context / Options / Decision / Consequences) |
 | [`docs/IMPLEMENTATION_NOTES.md`](docs/IMPLEMENTATION_NOTES.md) | Deviations from the original technical spec, with rationale |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Performance methodology + before/after measurements |
@@ -279,5 +279,5 @@ filled in after running k6 against pre- and post-change builds.
 
 ## License
 
-This project exists as a portfolio piece. No license declared yet — feel
+This project exists as a portfolio piece. No license declared yet - feel
 free to read, learn from, and reference; ask before reusing.
