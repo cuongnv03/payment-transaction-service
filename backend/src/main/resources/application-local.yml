@@ -12,7 +12,6 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: ""
   # Explicit Redisson config — bypasses auto-config issues on Windows/WSL2 where
   # Docker only binds Redis to IPv6 (::1), but Java resolves localhost → 127.0.0.1 (IPv4).
   # Property prefix 'spring.redis.redisson' is read by RedissonProperties.java in the starter.

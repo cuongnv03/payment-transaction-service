@@ -6,10 +6,12 @@ scrape_configs:
   - job_name: 'payment-service'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      # host.docker.internal resolves to the host machine from inside Docker
-      # Works on Docker Desktop (Mac/Windows). On Linux, use host-gateway
-      # or the host's IP (run: ip route show default | awk '/default/ {print $3}')
-      - targets: ['host.docker.internal:8080']
+      # When running the full stack via docker compose, the backend container
+      # is reachable as `backend:8080` on the compose network.
+      # If you instead run the backend on the host (./gradlew bootRun) and only
+      # the infra in compose, swap to `host.docker.internal:8080` (Docker
+      # Desktop on Mac/Windows) or your host IP on Linux.
+      - targets: ['backend:8080']
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance

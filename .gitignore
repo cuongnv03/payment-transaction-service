@@ -33,6 +33,10 @@ build/
 .project
 .factorypath
 .springBeans
+# Eclipse / VS Code Java extension build output (parallel to Gradle's build/)
+bin/
+**/bin/main/
+**/bin/test/
 
 # ── Spring Boot ───────────────────────────────────────────────────────────────
 *.log

@@ -9,6 +9,7 @@ singleServerConfig:
   # With preferIPv6Addresses=true (set in build.gradle bootRun jvmArgs),
   # "localhost" resolves to ::1 which IS the Docker Desktop listener on this machine.
   address: "redis://localhost:6379"
+  password: null
   connectionPoolSize: 8
   connectionMinimumIdleSize: 2
   idleConnectionTimeout: 10000
