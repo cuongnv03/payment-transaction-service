@@ -38,11 +38,11 @@ import { Counter, Rate } from 'k6/metrics';
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
-const SENDER_USERNAME = __ENV.SENDER_USERNAME || 'loadtest-sender';
-const SENDER_EMAIL = __ENV.SENDER_EMAIL || 'loadtest-sender@example.com';
+const SENDER_USERNAME = __ENV.SENDER_USERNAME || 'alice';
+const SENDER_EMAIL = __ENV.SENDER_EMAIL || 'alice@x.com';
 const SENDER_PASSWORD = __ENV.SENDER_PASSWORD || 'password123';
-const RECEIVER_USERNAME = __ENV.RECEIVER_USERNAME || 'loadtest-receiver';
-const RECEIVER_EMAIL = __ENV.RECEIVER_EMAIL || 'loadtest-receiver@example.com';
+const RECEIVER_USERNAME = __ENV.RECEIVER_USERNAME || 'bob';
+const RECEIVER_EMAIL = __ENV.RECEIVER_EMAIL || 'bob@x.com';
 const RECEIVER_PASSWORD = __ENV.RECEIVER_PASSWORD || 'password123';
 
 const STEADY_VUS = parseInt(__ENV.VUS || '100', 10);
@@ -55,6 +55,7 @@ const WRITE_RATIO = parseFloat(__ENV.WRITE_RATIO || '0.1');
 
 // ── Custom metrics ─────────────────────────────────────────────────────────────
 const insufficientFunds = new Counter('insufficient_funds_responses');
+const rateLimitHits = new Counter('rate_limit_responses');
 const writeAttemptRate = new Rate('writes_per_iteration');
 
 // ── Test options & thresholds ──────────────────────────────────────────────────
@@ -82,8 +83,9 @@ export const options = {
     // so the high-percentile threshold can't be met by a few outliers being slow.
     'http_req_duration': ['p(95)<500', 'p(99)<2000'],
 
-    // Error budget: <1 % of requests counted as failures. Note: 422 responses
-    // (insufficient funds) are tagged as non-errors and excluded from this rate.
+    // Error budget: <1 % of requests counted as failures. 422 (insufficient funds)
+    // and 429 (rate limited) are excluded via responseCallback — only 5xx / network
+    // failures count as errors here.
     'http_req_failed': ['rate<0.01'],
 
     // Per-endpoint visibility — also useful for diagnosing which path is slow.
@@ -155,23 +157,23 @@ function createTransaction(token, receiverAccountId) {
       'Content-Type': 'application/json',
       'Idempotency-Key': idempotencyKey,
     },
-    tags: {
-      endpoint: 'create_transaction',
-      // 422 (INSUFFICIENT_FUNDS) is an expected business outcome under sustained
-      // write load against a finite balance — flag the request so the default
-      // http_req_failed metric ignores it.
-      expected_response: 'true',
-    },
+    // responseCallback marks which status codes are "expected" — k6 excludes
+    // them from http_req_failed. 429 (rate limited) is a valid business outcome
+    // when 100 VUs share one sender account; it should not count as an error.
+    responseCallback: http.expectedStatuses(201, 422, 429),
+    tags: { endpoint: 'create_transaction' },
   });
 
-  // Expected statuses: 201 (created) or 422 (insufficient funds). Anything else
-  // is an unexpected error.
+  // Expected statuses: 201 (created), 422 (insufficient funds), 429 (rate limited).
+  // Anything else (5xx, network failure) is an unexpected error.
   const ok = check(res, {
-    'create status is 201 or 422': (r) => r.status === 201 || r.status === 422,
+    'create status is 201, 422, or 429': (r) => r.status === 201 || r.status === 422 || r.status === 429,
   });
 
   if (res.status === 422) {
     insufficientFunds.add(1);
+  } else if (res.status === 429) {
+    rateLimitHits.add(1);
   } else if (!ok) {
     console.warn(`[create] unexpected status=${res.status} body=${res.body}`);
   }
