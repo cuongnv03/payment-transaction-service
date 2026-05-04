@@ -14,6 +14,8 @@ load-tested SLAs.
 
 ## Live demo
 
+See details at [API Demo](api-demo.md).
+
 > Deployment not set up - this is a backend-focused portfolio piece.
 > The responses below are captured from a live local run.
 
